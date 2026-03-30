@@ -1,0 +1,3 @@
+run_qwen3-8b*.sh
+qwen3-8b*/
+logs/

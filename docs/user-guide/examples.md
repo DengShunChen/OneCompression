@@ -96,6 +96,31 @@ runner = Runner(model_config=model_config, quantizer=gptq, qep=False)
 runner.run()
 ```
 
+## JointQ (4-bit, groupsize=128)
+
+Quantize a model using JointQ, which jointly optimizes weight assignments and scale parameters:
+
+```python
+from onecomp import JointQ, ModelConfig, Runner, setup_logger
+
+setup_logger()
+
+model_config = ModelConfig(
+    model_id="TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T",
+    device="cuda:0",
+)
+jointq = JointQ(bits=4, group_size=128)
+
+runner = Runner(model_config=model_config, quantizer=jointq, qep=False)
+runner.run()
+
+original_ppl, dequantized_ppl, _ = runner.calculate_perplexity(
+    original_model=True, dequantized_model=True, quantized_model=False,
+)
+print(f"Original model perplexity: {original_ppl}")
+print(f"Dequantized model perplexity: {dequantized_ppl}")
+```
+
 ## Chunked Calibration (Large-scale Data)
 
 When using large calibration datasets that don't fit in GPU memory, use chunked calibration.

@@ -1,0 +1,25 @@
+model_path: null
+model_device: auto
+
+# Output directory
+output_dir: llama3-8b
+
+# Calibration data parameters (used by GPTQ, JointQ, DBF, QUIP)
+max_length: 2048
+num_calibration_samples: 1024
+calibration_strategy: drop_rand
+calibration_seed: 0
+calibration_batch_size: 64
+
+# Evaluation
+calc_ppl: true
+calc_original_ppl: true
+calc_acc: true
+calc_original_acc: true
+
+# Hydra
+hydra:
+  run:
+    dir: ${output_dir}
+  job:
+    chdir: true

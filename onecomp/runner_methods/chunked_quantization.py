@@ -294,13 +294,10 @@ def quantize_group(quantizer, group, xtx_dict, nsamples):
         start_time = time.time()
 
         if quantizer.flag_xtx:
-            # Pass X^T X directly (JointQ, etc.)
-            # TODO: If quantize_layer modifies matrix_XX in-place,
-            #       xtx_dict[name] will be corrupted. This is not an issue
-            #       currently, but consider using .clone() in case the
-            #       quantize_layer implementation changes in the future.
+            # Pass a clone of X^T X so that in-place modifications
+            # inside quantize_layer do not corrupt the shared xtx_dict.
             result = quantizer.quantize_layer(
-                module, input=None, matrix_XX=xtx_dict[name], dim_n=nsamples
+                module, input=None, matrix_XX=xtx_dict[name].clone(), dim_n=nsamples
             )
         elif quantizer.flag_hessian:
             # X^T X -> Hessian: H = (2 / nsamples) * X^T X

@@ -1,6 +1,6 @@
-# Llama-3-8B GPTQ Benchmark
+# Qwen3-14B GPTQ Benchmark
 
-GPTQ benchmark for [Meta-Llama-3-8B](https://huggingface.co/meta-llama/Meta-Llama-3-8B) using OneComp v0.3.7.
+GPTQ benchmark for [Qwen3-14B](https://huggingface.co/Qwen/Qwen3-14B) using OneComp v0.3.7+jointq.
 
 All combinations of `bits × group_size` are run in a single pass, sharing calibration data accumulation across quantizers for efficiency.
 
@@ -44,11 +44,11 @@ Requires [Hydra](https://hydra.cc/) (see [benchmark/README.md](../README.md) for
 
 ```bash
 # default
-python quant_benchmark.py model_path=/path/to/Meta-Llama-3-8B
+python quant_benchmark.py model_path=/path/to/Qwen3-14B
 
 # mse+actorder
-python quant_benchmark.py model_path=/path/to/Meta-Llama-3-8B \
-    gptq.actorder=true gptq.mse=true output_dir=llama3-8b-mse-actorder
+python quant_benchmark.py model_path=/path/to/Qwen3-14B \
+    gptq.actorder=true gptq.mse=true output_dir=qwen3-14b-mse-actorder
 ```
 
 ### Hydra Overrides
@@ -71,29 +71,29 @@ PPL = perplexity on WikiText-2 (↓ lower is better). Accuracy = 0-shot `acc_nor
 
 | bits | group_size | PPL | ARC-c | ARC-e | PIQA | WinoGrande | Time (s) |
 |---|---|---|---|---|---|---|---|
-| — (Original) | — | 6.14 | 0.5401 | 0.7761 | 0.8063 | 0.7380 | — |
-| 4 | 128 | 12.66 | 0.5026 | 0.7710 | 0.7922 | 0.7206 | 276.8 |
-| 4 | per-channel | 665.94 | 0.3089 | 0.5076 | 0.6861 | 0.6298 | 268.9 |
-| 3 | 128 | 45.22 | 0.3097 | 0.4886 | 0.6610 | 0.6259 | 273.8 |
-| 3 | per-channel | 1721.06 | 0.2167 | 0.2862 | 0.5419 | 0.5004 | 268.4 |
+| — (Original) | — | 8.64 | 0.6032 | 0.8283 | 0.7971 | 0.7293 | — |
+| 4 | 128 | 8.85 | 0.5947 | 0.8182 | 0.7982 | 0.7316 | 481.9 |
+| 4 | per-channel | 9.15 | 0.5802 | 0.8056 | 0.7873 | 0.7056 | 470.1 |
+| 3 | 128 | 10.10 | 0.5307 | 0.7727 | 0.7873 | 0.7001 | 480.1 |
+| 3 | per-channel | 13.72 | 0.3976 | 0.5745 | 0.7356 | 0.6172 | 468.4 |
 
-Total elapsed time (including calibration data preparation): 3697.5 s (~62 min).
+Total elapsed time (including calibration data preparation): 7414.3 s (~124 min).
 
 ### GPTQ (mse+actorder)
 
 | bits | group_size | PPL | ARC-c | ARC-e | PIQA | WinoGrande | Time (s) |
 |---|---|---|---|---|---|---|---|
-| — (Original) | — | 6.14 | 0.5401 | 0.7761 | 0.8063 | 0.7380 | — |
-| 4 | 128 | 6.55 | 0.5452 | 0.7879 | 0.7987 | 0.7332 | 1412.9 |
-| 4 | per-channel | 8.25 | 0.4727 | 0.7475 | 0.7905 | 0.7388 | 366.4 |
-| 3 | 128 | 8.02 | 0.4667 | 0.7226 | 0.7699 | 0.7261 | 1663.6 |
-| 3 | per-channel | 22.58 | 0.3029 | 0.4811 | 0.6834 | 0.6740 | 369.7 |
+| — (Original) | — | 8.64 | 0.6032 | 0.8283 | 0.7971 | 0.7293 | — |
+| 4 | 128 | 8.89 | 0.6101 | 0.8300 | 0.7911 | 0.7277 | 2288.2 |
+| 4 | per-channel | 9.26 | 0.5922 | 0.8249 | 0.8025 | 0.7261 | 611.3 |
+| 3 | 128 | 9.44 | 0.5811 | 0.8047 | 0.7933 | 0.7056 | 2694.7 |
+| 3 | per-channel | 15.52 | 0.4855 | 0.7311 | 0.7677 | 0.6543 | 616.8 |
 
-Total elapsed time (including calibration data preparation): 6393.1 s (~107 min).
+Total elapsed time (including calibration data preparation): 11776.3 s (~196 min).
 
 ## Environment
 
-- GPU: NVIDIA B200 × 1
+- GPU: NVIDIA B200 × 2
 
 ## Notes
 

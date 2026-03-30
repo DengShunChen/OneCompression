@@ -15,6 +15,15 @@
   - Provides learning-based post-quantization fine-tuning for GPTQ-quantized models
   - Public API is exposed as `PostProcessLoraSFT`
 
+### Added JointQ Quantizer
+
+- **Added new `JointQ` quantizer (`onecomp/quantizer/jointq/`)**
+  - Local-search-based post-training quantization method that minimizes ||Y - hat{W} X^T||_F^2
+  - Supports both symmetric and asymmetric quantization (1–4 bits)
+  - Group-wise quantization with configurable group size
+  - Tikhonov regularization for over-fitting (X^T X + nλI)
+  - Three initialization strategies: Clip-Optimize, Clip-Optimize with Error Propagation, and GPTQ
+
 ### API changes
 
 - Made `Runner.create_quantized_model()` a public method (renamed from `_create_quantized_model`)
@@ -27,11 +36,25 @@
   - Counterpart to `save_quantized_model_pt`; uses `torch.load` to restore models with custom modules
   - Also available as `onecomp.load_quantized_model_pt()` convenience alias
 
+### Bug Fix: Onebit Quantizer
+
+- Fixed `Onebit` to declare `flag_calibration=True` and `flag_hessian=True` (`onecomp/quantizer/onebit/_onebit.py`)
+  - Previously, Onebit computed the Hessian internally from `input` despite declaring all flags as `False`, causing a crash when used through `quantize_without_calibration` or chunked quantization paths
+  - Now uses the Hessian provided by the Runner, consistent with other calibration-based quantizers (GPTQ, DBF, QUIP)
+
+### Quantizer Signature Consistency
+
+- Added `input=None` default to `quantize_layer` in `RTN`, `CQ`, `QBB` (`onecomp/quantizer/{rtn,cq,qbb}/`)
+  - Aligns with the base `Quantizer.quantize_layer(self, module, input=None, hessian=None)` signature
+  - Enables these quantizers to be used in `Runner(quantizers=[...])` via the chunked quantization path
+- Added `input=None, hessian=None` defaults to `Onebit.quantize_layer` for the same reason
+
 ### Examples
 
 - Added `example/post_process/example_lora_sft.py`: End-to-end demo — GPTQ 4-bit quantization + LoRA SFT (WikiText-2) + PPL evaluation + save/load with `save_quantized_model_pt` / `load_quantized_model_pt`
 - Added `example/post_process/example_lora_sft_knowledge.py`: Knowledge injection demo — teaches the quantized model about "OneCompression" via LoRA SFT and compares generation before/after
 - Added `example/post_process/onecomp_knowledge.jsonl`: Training data describing OneCompression for the knowledge injection example
+- Added `example/example_jointq.py`: JointQ 4-bit (groupsize=128) quantization example with dequantized model PPL evaluation
 
 ### Documentation
 
@@ -53,6 +76,14 @@
 - Expanded and updated unit tests for GPTQ quantizer (`tests/onecomp/quantizer/gptq/test_gptq.py`)
   - Extended boundary and abnormal parameter cases; aligned with `BaseQuantizeSpec` and current GPTQ API
 - Adjusted DBF and GPTQ quantizer implementations for test compatibility and consistency (`onecomp/quantizer/dbf/_dbf.py`, `onecomp/quantizer/gptq/_gptq.py`)
+- Fixed and improved JointQ unit tests (`tests/onecomp/quantizer/jointq/test_jointq.py`)
+  - Use `compute_dequantized_weight()` instead of direct `dequantized_weight` access
+  - Override boundary test to use CUDA with 128×128 layers for group_size compatibility
+  - Skip CPU-only tests (JointQ is GPU-based)
+  - Fix `batch_size` validation: `>= 0` → `>= 1` (`onecomp/quantizer/jointq/_jointq.py`)
+- Improved JointQ regression test (`tests/onecomp/quantizer/jointq/test_quantize_regression.py`)
+  - Replaced exact tensor match with MSE-based quality check for environment portability
+  - Hardcoded expected MSE in helper; removed `.pth` baseline file
 
 ## [v0.4.3] 2026-03-26
 
@@ -223,19 +254,6 @@
 - Restricted `requires-python` to `">=3.12, <3.14"` in `pyproject.toml`
   - PyTorch does not yet provide wheels for Python 3.14, causing `uv sync` to fail when uv auto-selects CPython 3.14
 - Updated `uv.lock` to reflect the new Python version constraint
-
-### Bug Fix: Onebit Quantizer
-
-- Fixed `Onebit` to declare `flag_calibration=True` and `flag_hessian=True` (`onecomp/quantizer/onebit/_onebit.py`)
-  - Previously, Onebit computed the Hessian internally from `input` despite declaring all flags as `False`, causing a crash when used through `quantize_without_calibration` or chunked quantization paths
-  - Now uses the Hessian provided by the Runner, consistent with other calibration-based quantizers (GPTQ, DBF, QUIP)
-
-### Quantizer Signature Consistency
-
-- Added `input=None` default to `quantize_layer` in `RTN`, `CQ`, `QBB` (`onecomp/quantizer/{rtn,cq,qbb}/`)
-  - Aligns with the base `Quantizer.quantize_layer(self, module, input=None, hessian=None)` signature
-  - Enables these quantizers to be used in `Runner(quantizers=[...])` via the chunked quantization path
-- Added `input=None, hessian=None` defaults to `Onebit.quantize_layer` for the same reason
 
 ## [v0.3.7] 2026-03-16
 
