@@ -1,6 +1,6 @@
 # Change log
 
-## [v0.4.4] 2026-03-27
+## [v0.5.0] 2026-03-30
 
 ### New Feature: Post-quantization Workflow
 
