@@ -6,4 +6,4 @@ Author: Keiji Kimura
 
 """
 
-from ._jointq import JointQ
+from .quantize_advanced import quantize_advanced

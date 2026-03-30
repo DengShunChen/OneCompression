@@ -1,6 +1,6 @@
-# Llama-3-8B GPTQ Benchmark
+# Qwen3-8B GPTQ Benchmark
 
-GPTQ benchmark for [Meta-Llama-3-8B](https://huggingface.co/meta-llama/Meta-Llama-3-8B) using OneComp v0.3.7.
+GPTQ benchmark for [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) using OneComp v0.3.7+jointq.
 
 All combinations of `bits × group_size` are run in a single pass, sharing calibration data accumulation across quantizers for efficiency.
 
@@ -44,11 +44,11 @@ Requires [Hydra](https://hydra.cc/) (see [benchmark/README.md](../README.md) for
 
 ```bash
 # default
-python quant_benchmark.py model_path=/path/to/Meta-Llama-3-8B
+python quant_benchmark.py model_path=/path/to/Qwen3-8B
 
 # mse+actorder
-python quant_benchmark.py model_path=/path/to/Meta-Llama-3-8B \
-    gptq.actorder=true gptq.mse=true output_dir=llama3-8b-mse-actorder
+python quant_benchmark.py model_path=/path/to/Qwen3-8B \
+    gptq.actorder=true gptq.mse=true output_dir=qwen3-8b-mse-actorder
 ```
 
 ### Hydra Overrides
@@ -71,25 +71,25 @@ PPL = perplexity on WikiText-2 (↓ lower is better). Accuracy = 0-shot `acc_nor
 
 | bits | group_size | PPL | ARC-c | ARC-e | PIQA | WinoGrande | Time (s) |
 |---|---|---|---|---|---|---|---|
-| — (Original) | — | 6.14 | 0.5401 | 0.7761 | 0.8063 | 0.7380 | — |
-| 4 | 128 | 12.66 | 0.5026 | 0.7710 | 0.7922 | 0.7206 | 276.8 |
-| 4 | per-channel | 665.94 | 0.3089 | 0.5076 | 0.6861 | 0.6298 | 268.9 |
-| 3 | 128 | 45.22 | 0.3097 | 0.4886 | 0.6610 | 0.6259 | 273.8 |
-| 3 | per-channel | 1721.06 | 0.2167 | 0.2862 | 0.5419 | 0.5004 | 268.4 |
+| — (Original) | — | 9.72 | 0.5657 | 0.8093 | 0.7775 | 0.6756 | — |
+| 4 | 128 | 10.29 | 0.5538 | 0.7946 | 0.7677 | 0.6709 | 275.8 |
+| 4 | per-channel | 10.97 | 0.5085 | 0.7412 | 0.7688 | 0.6693 | 269.0 |
+| 3 | 128 | 11.71 | 0.4966 | 0.7273 | 0.7486 | 0.6440 | 275.2 |
+| 3 | per-channel | 20.21 | 0.3234 | 0.4293 | 0.6806 | 0.5501 | 269.1 |
 
-Total elapsed time (including calibration data preparation): 3697.5 s (~62 min).
+Total elapsed time (including calibration data preparation): 3949.8 s (~66 min).
 
 ### GPTQ (mse+actorder)
 
 | bits | group_size | PPL | ARC-c | ARC-e | PIQA | WinoGrande | Time (s) |
 |---|---|---|---|---|---|---|---|
-| — (Original) | — | 6.14 | 0.5401 | 0.7761 | 0.8063 | 0.7380 | — |
-| 4 | 128 | 6.55 | 0.5452 | 0.7879 | 0.7987 | 0.7332 | 1412.9 |
-| 4 | per-channel | 8.25 | 0.4727 | 0.7475 | 0.7905 | 0.7388 | 366.4 |
-| 3 | 128 | 8.02 | 0.4667 | 0.7226 | 0.7699 | 0.7261 | 1663.6 |
-| 3 | per-channel | 22.58 | 0.3029 | 0.4811 | 0.6834 | 0.6740 | 369.7 |
+| — (Original) | — | 9.72 | 0.5657 | 0.8093 | 0.7775 | 0.6756 | — |
+| 4 | 128 | 9.81 | 0.5538 | 0.8035 | 0.7775 | 0.6859 | 1433.3 |
+| 4 | per-channel | 11.18 | 0.5410 | 0.7803 | 0.7791 | 0.6693 | 371.1 |
+| 3 | 128 | 11.29 | 0.5034 | 0.7609 | 0.7633 | 0.6969 | 1688.5 |
+| 3 | per-channel | 42.71 | 0.3157 | 0.4407 | 0.6801 | 0.5604 | 376.2 |
 
-Total elapsed time (including calibration data preparation): 6393.1 s (~107 min).
+Total elapsed time (including calibration data preparation): 6715.4 s (~112 min).
 
 ## Environment
 

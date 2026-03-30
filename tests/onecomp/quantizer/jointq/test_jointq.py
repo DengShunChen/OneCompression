@@ -42,15 +42,15 @@ class TestJointQ(BaseQuantizeSpec):
     boundary_parameters = [
         # bits: int >= 1 (validated by validate_params), no explicit upper
         {"bits": 1},  # bits lower boundary
-        {"bits": 32},  # bits large value (no explicit upper bound)
+        {"bits": 4},  # bits upper boundary (jointq core supports 1-4)
         # symmetric: bool
         {"symmetric": True},
         {"symmetric": False},
         # group_size: int >= 1 (validated by validate_params), no explicit upper
         {"group_size": 1},  # group_size lower boundary
-        {"group_size": 1024},  # group_size large value (no explicit upper bound)
-        # batch_size: int >= 0 (validated by validate_params), no explicit upper
-        {"batch_size": 0},  # batch_size lower boundary
+        {"group_size": 128},  # group_size large value (no explicit upper bound)
+        # batch_size: int >= 1 or None (validated by validate_params), no explicit upper
+        {"batch_size": 1},  # batch_size lower boundary
         {"batch_size": 10000},  # batch_size large value (no explicit upper bound)
         # log_level: int in 0..2 (validated by validate_params)
         {"log_level": 0},  # log_level lower boundary
@@ -92,7 +92,7 @@ class TestJointQ(BaseQuantizeSpec):
             "bits": 1,
             "symmetric": False,
             "group_size": 1,
-            "batch_size": 0,
+            "batch_size": 1,
             "log_level": 0,
             "ils_enabled": False,
             "ils_num_iterations": 1,
@@ -101,9 +101,9 @@ class TestJointQ(BaseQuantizeSpec):
         },
         # all maximum
         {
-            "bits": 32,
+            "bits": 4,
             "symmetric": True,
-            "group_size": 1024,
+            "group_size": 128,
             "batch_size": 10000,
             "log_level": 2,
             "ils_enabled": True,
@@ -115,7 +115,8 @@ class TestJointQ(BaseQuantizeSpec):
     abnormal_parameters = [
         {"bits": 0},  # below lower boundary (bits >= 1)
         {"group_size": 0},  # below lower boundary (group_size >= 1)
-        {"batch_size": -1},  # below lower boundary (batch_size >= 0)
+        {"batch_size": 0},  # below lower boundary (batch_size >= 1)
+        {"batch_size": -1},  # below lower boundary (batch_size >= 1)
         {"log_level": -1},  # below lower boundary (log_level in 0..2)
         {"log_level": 3},  # above upper boundary (log_level in 0..2)
         {
@@ -136,14 +137,14 @@ class TestJointQ(BaseQuantizeSpec):
     ):
         """Validate types, shapes, and devices of quantize_layer outputs."""
         assert isinstance(result, self.result_cls)
-        assert hasattr(result, "dequantized_weight")
-        assert isinstance(result.dequantized_weight, torch.Tensor)
-        assert result.dequantized_weight.shape == layer.weight.shape
-        assert result.dequantized_weight.device == torch.device("cpu")
+        dw = result.compute_dequantized_weight()
+        assert isinstance(dw, torch.Tensor)
+        assert dw.shape == layer.weight.shape
+        assert dw.device == torch.device("cpu")
 
     def check_equal_results(self, r1, r2):
         """Validate equality of quantization result objects."""
-        assert torch.equal(r1.dequantized_weight, r2.dequantized_weight)
+        assert torch.equal(r1.compute_dequantized_weight(), r2.compute_dequantized_weight())
 
     def check_quantize_error(self, error, max_error):
         """Validate that quantization error is within tolerance."""
@@ -171,7 +172,38 @@ class TestJointQ(BaseQuantizeSpec):
 
     def apply_quantized_weights(self, module, result, device):
         """Apply quantized weights to a module."""
-        module.weight.data = result.dequantized_weight.to(device)
+        dw = result.compute_dequantized_weight().to(device=device, dtype=module.weight.dtype)
+        module.weight.data = dw
+
+    @pytest.mark.parametrize("device", ["cpu", "cuda"])
+    def test_quantize_layer_returns(self, device, helper):
+        """Skip CPU; JointQ is GPU-based."""
+        if device == "cpu":
+            pytest.skip("JointQ is GPU-based, skipping CPU test")
+        super().test_quantize_layer_returns(device, helper)
+
+    @pytest.mark.parametrize("device", ["cpu", "cuda"])
+    def test_quantize_layer_reproducibility(self, device, helper):
+        """Skip CPU; JointQ is GPU-based."""
+        if device == "cpu":
+            pytest.skip("JointQ is GPU-based, skipping CPU test")
+        super().test_quantize_layer_reproducibility(device, helper)
+
+    def test_cpu_gpu_output_match(self, helper):
+        """Skip; JointQ is GPU-based."""
+        pytest.skip("JointQ is GPU-based, CPU/GPU comparison not applicable")
+
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+    def test_parameters_boundary(self, params, helper):
+        """Override to use a larger layer on CUDA, compatible with group_size up to 128."""
+        device = "cuda"
+        layer = helper.make_linear(128, 128, device=device, dtype=torch.float32)
+        inp = helper.make_input(batch=1, seq=1, hidden=128, device=device, dtype=torch.float32)
+
+        q = self.make_quantizer(**params)
+        hessian = q.calculate_hessian(layer, inp)
+        result = q.quantize_layer(layer, inp, hessian=hessian)
+        self.check_quantize_layer(result, layer)
 
     def test_forward_error(self, helper):
         """Skip forward error test (no inference layer support)."""

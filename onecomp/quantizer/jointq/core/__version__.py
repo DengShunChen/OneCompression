@@ -6,4 +6,4 @@ Author: Keiji Kimura
 
 """
 
-from ._jointq import JointQ
+__version__ = "2.5.5"

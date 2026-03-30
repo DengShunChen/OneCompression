@@ -14,7 +14,7 @@ from typing import Dict, Any, List, Optional
 
 import torch
 
-from jointq import quantize_advanced
+from onecomp.quantizer.jointq.core import quantize_advanced
 from onecomp.quantizer.jointq._jointq import JointQResult
 from onecomp.utils import capture_input_activations
 

@@ -11,7 +11,7 @@ from typing import Optional
 
 import torch
 
-from jointq import compute_matrix_XX, quantize
+from .core import compute_matrix_XX, quantize
 
 from onecomp.quantizer._quantizer import Quantizer, QuantizationResult
 
@@ -38,6 +38,9 @@ class JointQResult(QuantizationResult):
         - The dequantized weight can be reconstructed as follows:
           W_hat[i, g*group_size:(g+1)*group_size]
               = scale[i, g] * (assignment[i, g, :] - zero_point[i, g])
+        - When actorder is used, scale/zero_point/assignment are stored in
+          the permuted column order. Use ``perm`` to map back to original
+          column order (see ``compute_dequantized_weight``).
     """
 
     # =========================================
@@ -53,6 +56,7 @@ class JointQResult(QuantizationResult):
     scale: Optional[torch.Tensor] = None  # Scale factor
     zero_point: Optional[torch.Tensor] = None  # Zero point
     assignment: Optional[torch.Tensor] = None  # Integer assignment
+    perm: Optional[torch.Tensor] = None  # Column permutation (actorder)
 
     def compute_dequantized_weight(self, device: torch.device = None) -> torch.Tensor:
         """Compute the dequantized weight from quantization parameters
@@ -97,6 +101,13 @@ class JointQResult(QuantizationResult):
         # Reshape to (out_features, num_groups * group_size) = (out_features, in_features)
         dequantized_weight = dequantized.reshape(out_features, -1)
 
+        # Inverse-permute columns when actorder was used
+        if self.perm is not None:
+            invperm = torch.argsort(self.perm)
+            if device is not None:
+                invperm = invperm.to(device)
+            dequantized_weight = dequantized_weight[:, invperm]
+
         return dequantized_weight.to(torch.float16).cpu()
 
 
@@ -112,13 +123,17 @@ class JointQ(Quantizer):
         group_size (int or None): Group size for quantization. Default is 128.
             If None, per-channel quantization is used.
         batch_size (int): Batch size for quantization. Default is None (solve all at once).
-        log_level (int): Log level (0: none, 1: minimal, 2: detailed). Default is 1.
+        log_level (int): Log level (0: none, 1: minimal, 2: detailed). Default is 0.
         device (torch.device): Device for quantization.
         regularization_lambda (float): Tikhonov regularization strength. Default is 0.2.
             Replaces X^T X with X^T X + n*λ*I, where n = dim_n.
             λ is relative to the normalized Hessian (1/n)X^T X, so its meaning
             is consistent across different calibration sample sizes.
             Recommended range: 0.1 to 1.0.
+        actorder (bool): Whether to reorder columns by activation magnitude
+            (Hessian diagonal) before quantization. Default is False.
+            When enabled, columns with larger activations are grouped together,
+            improving group quantization efficiency and GPTQ initial solution quality.
         ils_enabled (bool): Whether to enable Iterated Local Search. Default is False.
         ils_num_iterations (int): Number of ILS iterations. Default is 10.
         ils_num_clones (int): Number of ILS clones. Default is 8.
@@ -174,13 +189,16 @@ class JointQ(Quantizer):
     symmetric: bool = False
     group_size: int = 128
     batch_size: Optional[int] = None
-    log_level: int = 1  # 0: none, 1: minimal, 2: detailed, 3: debug
+    log_level: int = 0  # 0: none, 1: minimal, 2: detailed, 3: debug
 
     # Device settings
     device: Optional[torch.device] = None
 
     # Tikhonov regularization: X^T X + n*λ*I
     regularization_lambda: Optional[float] = 0.2
+
+    # Activation ordering
+    actorder: bool = False
 
     # Iterated Local Search (ILS) parameters
     ils_enabled: bool = False
@@ -194,7 +212,7 @@ class JointQ(Quantizer):
         Validated ranges:
             bits: int >= 1
             group_size: int >= 1
-            batch_size: int >= 0
+            batch_size: int >= 1 or None
             log_level: int in {0, 1, 2}
             ils_num_iterations: int >= 1 (when ils_enabled=True)
             ils_num_clones: int >= 1 (when ils_enabled=True)
@@ -211,10 +229,10 @@ class JointQ(Quantizer):
             )
 
         if self.batch_size is not None and not (
-            isinstance(self.batch_size, int) and self.batch_size >= 0
+            isinstance(self.batch_size, int) and self.batch_size >= 1
         ):
             bad.append(
-                f"Invalid JointQ parameter 'batch_size': {self.batch_size!r} (expected int >= 0 or None)."
+                f"Invalid JointQ parameter 'batch_size': {self.batch_size!r} (expected int >= 1 or None)."
             )
 
         if not (isinstance(self.log_level, int) and 0 <= self.log_level <= 2):
@@ -308,6 +326,13 @@ class JointQ(Quantizer):
             matrix_XX = compute_matrix_XX(matrix_X, device)
             del matrix_X
 
+        # Activation ordering: sort columns by X^T X diagonal (descending)
+        perm = None
+        if self.actorder:
+            perm = torch.argsort(torch.diag(matrix_XX), descending=True)
+            matrix_W = matrix_W[:, perm.to(matrix_W.device)]
+            matrix_XX = matrix_XX[perm][:, perm]
+
         # Tikhonov regularization: X^T X → X^T X + n*λ*I
         if self.regularization_lambda is not None and self.regularization_lambda > 0.0:
             matrix_XX = matrix_XX + (dim_n * self.regularization_lambda) * torch.eye(
@@ -339,4 +364,5 @@ class JointQ(Quantizer):
             scale=scale.cpu(),
             zero_point=zero_point.cpu(),
             assignment=assignment.cpu(),
+            perm=perm.cpu() if perm is not None else None,
         )
