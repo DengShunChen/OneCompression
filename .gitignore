@@ -16,3 +16,5 @@ site/
 debug_code/
 .pytest_cache/
 *.pt
+# Large test data (download separately if needed for regression tests)
+tests/onecomp/quantizer/jointq/data/model_layers_0_self_attn_k_proj.pth
