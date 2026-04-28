@@ -1,6 +1,6 @@
 """
 
-Model validation: AutoBit quantization (target_bit=4, qep=True)
+Model validation: AutoBit quantization (target_bit=4, qep=False)
 
 Hydra entry point for validating OneComp's AutoBit quantizer across
 multiple models. The model is selected via either ``model_id`` (Hugging
@@ -55,9 +55,9 @@ def main(cfg: DictConfig):
         ),
         quantizer=quantizer,
         calibration_config=CalibrationConfig(
-            max_length=1024, num_calibration_samples=128
+            max_length=512, num_calibration_samples=128
         ),
-        qep=True,
+        qep=False,
     )
 
     runner.run()

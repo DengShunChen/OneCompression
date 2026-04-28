@@ -1,8 +1,8 @@
 """
 
-Model validation: AutoBit quantization (target_bit=4, qep=True)
+Model validation: GPTQ quantization (wbits=4, groupsize=128, qep=True)
 
-Hydra entry point for validating OneComp's AutoBit quantizer across
+Hydra entry point for validating OneComp's GPTQ quantizer with QEP across
 multiple models. The model is selected via either ``model_id`` (Hugging
 Face Hub) or ``model_path`` (local). Exactly one of the two must be
 provided; otherwise the script exits with ``ValueError``.
@@ -10,8 +10,8 @@ provided; otherwise the script exits with ``ValueError``.
 Copyright 2025-2026 Fujitsu Ltd.
 
 Usage:
-    python validate_autobit.py model_path=/path/to/model
-    python validate_autobit.py model_id=TinyLlama/TinyLlama-1.1B-...
+    python validate_gptq.py model_path=/path/to/model
+    python validate_gptq.py model_id=TinyLlama/TinyLlama-1.1B-...
 
 """
 
@@ -19,7 +19,6 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from onecomp import (
-    AutoBitQuantizer,
     CalibrationConfig,
     GPTQ,
     ModelConfig,
@@ -41,11 +40,7 @@ def main(cfg: DictConfig):
     if cfg.model_id is not None and cfg.model_path is not None:
         raise ValueError("Specify only one of model_id or model_path")
 
-    quantizer = AutoBitQuantizer(
-        assignment_strategy="activation_aware",
-        target_bit=4,
-        quantizers=[GPTQ(wbits=b, groupsize=128) for b in (2, 3, 4, 8)],
-    )
+    quantizer = GPTQ(wbits=4, groupsize=128)
 
     runner = Runner(
         model_config=ModelConfig(

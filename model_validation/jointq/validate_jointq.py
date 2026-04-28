@@ -1,17 +1,21 @@
 """
 
-Model validation: AutoBit quantization (target_bit=4, qep=True)
+Model validation: JointQ quantization (bits=4, group_size=128, symmetric=True, qep=False)
 
-Hydra entry point for validating OneComp's AutoBit quantizer across
+Hydra entry point for validating OneComp's JointQ quantizer across
 multiple models. The model is selected via either ``model_id`` (Hugging
 Face Hub) or ``model_path`` (local). Exactly one of the two must be
 provided; otherwise the script exits with ``ValueError``.
 
+JointQ does not support ``save_quantized_model`` / a quantized-inference
+layer, so this script evaluates perplexity on the dequantized model
+instead.
+
 Copyright 2025-2026 Fujitsu Ltd.
 
 Usage:
-    python validate_autobit.py model_path=/path/to/model
-    python validate_autobit.py model_id=TinyLlama/TinyLlama-1.1B-...
+    python validate_jointq.py model_path=/path/to/model
+    python validate_jointq.py model_id=TinyLlama/TinyLlama-1.1B-...
 
 """
 
@@ -19,9 +23,8 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from onecomp import (
-    AutoBitQuantizer,
     CalibrationConfig,
-    GPTQ,
+    JointQ,
     ModelConfig,
     Runner,
     setup_logger,
@@ -41,11 +44,7 @@ def main(cfg: DictConfig):
     if cfg.model_id is not None and cfg.model_path is not None:
         raise ValueError("Specify only one of model_id or model_path")
 
-    quantizer = AutoBitQuantizer(
-        assignment_strategy="activation_aware",
-        target_bit=4,
-        quantizers=[GPTQ(wbits=b, groupsize=128) for b in (2, 3, 4, 8)],
-    )
+    quantizer = JointQ(bits=4, group_size=128, symmetric=True)
 
     runner = Runner(
         model_config=ModelConfig(
@@ -55,20 +54,19 @@ def main(cfg: DictConfig):
         ),
         quantizer=quantizer,
         calibration_config=CalibrationConfig(
-            max_length=1024, num_calibration_samples=128
+            max_length=512, num_calibration_samples=128
         ),
-        qep=True,
+        qep=False,
     )
 
     runner.run()
-    runner.save_quantized_model("./quantized")
 
-    original_ppl, _, quantized_ppl = runner.calculate_perplexity(
-        original_model=True, dequantized_model=False, quantized_model=True
+    original_ppl, dequantized_ppl, _ = runner.calculate_perplexity(
+        original_model=True, dequantized_model=True, quantized_model=False
     )
 
     print(f"Original model perplexity: {original_ppl}")
-    print(f"Quantized model perplexity: {quantized_ppl}")
+    print(f"Dequantized model perplexity: {dequantized_ppl}")
 
 
 if __name__ == "__main__":
